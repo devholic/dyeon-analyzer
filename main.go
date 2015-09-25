@@ -94,7 +94,7 @@ func getPost(id string) bool {
 
 func main() {
 	flag.StringVar(&username, "u", "", "dyeon id")
-	flag.StringVar(&password, "p", "", "dyeon pw")
+	flag.StringVar(&password, "p", "", "dyeon password")
 	flag.Parse()
 	color.Yellow("[!] Login")
 	l := login()
