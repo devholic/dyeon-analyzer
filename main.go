@@ -2,12 +2,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/fatih/color"
 	"github.com/garyburd/redigo/redis"
-	"golang.org/x/net/html"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
+	"strings"
 )
 
 const DYEON_URL string = "https://dyeon.net"
@@ -16,6 +20,9 @@ const LOGIN_URL string = "https://dyeon.net/user/login"
 
 // dyeon account
 var username, password string
+
+// target information
+var year, month, date string
 
 var httpClient = initHttpClient()
 var redisClient = connectRedis()
@@ -50,42 +57,25 @@ func login() bool {
 	}
 }
 
-func postCheck(t html.Token) bool {
-	for _, a := range t.Attr {
-		if a.Key == "tag" {
-			if a.Val == "V" {
-				return true
-			}
-		}
-	}
-	return false
+func postCheck() {
 }
 
 func getPostList(idx int) {
-	resp, _ := httpClient.PostForm(LOGIN_URL, url.Values{
-		"user[login]":    {username},
-		"user[password]": {password},
-		"to":             {DYEON_URL},
-	})
+	resp, _ := httpClient.Get(DYEON_BOARD_URL + "?page=" + strconv.Itoa(idx))
 	defer resp.Body.Close()
-	// http://schier.co/blog/2015/04/26/a-simple-web-scraper-in-go.html
-	t := html.NewTokenizer(resp.Body)
-	for {
-		n := t.Next()
-		switch {
-		case n == html.ErrorToken:
-			return
-		case n == html.StartTagToken:
-			t := t.Token()
-			isSpan := t.Data == "tag"
-			if isSpan {
-				color.Red("[!] List : Tag found")
-				continue
-			}
-			if postCheck(t) {
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	t := doc.Find("tbody").First()
+	t.Find("tr").Not(".ad").Not(".notice").Each(func(i int, s *goquery.Selection) {
+		link, exists := s.Find(".subject").Find("a").Attr("href")
+		if exists {
+			if strings.HasPrefix(link, "http://") {
+        fmt.Println(link)
 			}
 		}
-	}
+	})
 }
 
 func getPost(id string) bool {
@@ -93,14 +83,22 @@ func getPost(id string) bool {
 }
 
 func main() {
+	// args
 	flag.StringVar(&username, "u", "", "dyeon id")
 	flag.StringVar(&password, "p", "", "dyeon password")
+	flag.StringVar(&year, "y", "", "target year")
+	flag.StringVar(&month, "m", "", "target month")
+	flag.StringVar(&date, "d", "", "target date")
 	flag.Parse()
+
+	// try login
 	color.Yellow("[!] Login")
-	l := login()
-	if l {
+	if login() {
+		// if Success
 		color.Green("[!] Login : PASS")
+		getPostList(1)
 	} else {
+		// if Fail
 		color.Red("[!] Login : FAIL")
 	}
 }
