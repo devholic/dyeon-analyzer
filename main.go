@@ -24,6 +24,7 @@ var username, password string
 var year, month, date string
 
 // parse
+var startPage int
 var nextPage bool = true
 var enterLoop bool = false
 
@@ -121,6 +122,7 @@ func main() {
 	flag.StringVar(&year, "y", "", "target year")
 	flag.StringVar(&month, "m", "", "target month")
 	flag.StringVar(&date, "d", "", "target date")
+	flag.IntVar(&startPage, "s", 1, "start page")
 	flag.Parse()
 	// check args
 	if username == "" || password == "" || year == "" || month == "" || date == "" {
@@ -131,7 +133,7 @@ func main() {
 		if login() {
 			// if Success
 			color.Green("[!] Login : PASS")
-			getPostList(1)
+			getPostList(startPage)
 		} else {
 			// if Fail
 			color.Red("[!] Login : FAIL")
