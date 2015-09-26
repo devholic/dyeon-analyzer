@@ -41,11 +41,17 @@ func connectRedis() redis.Conn {
 
 func initHttpClient() *http.Client {
 	cookieJar, _ := cookiejar.New(nil)
-
 	client := &http.Client{
 		Jar: cookieJar,
 	}
 	return client
+}
+
+func initRedisHash() {
+	_, err := redisClient.Do("DEL", year+month+date+"_writeCount")
+	if err != nil {
+		log.Panic(err)
+	}
 }
 
 func login() bool {
@@ -59,6 +65,27 @@ func login() bool {
 	} else {
 		return false
 	}
+}
+
+func getComment(link string) {
+	color.Yellow("[!] Parse link : ", link)
+	resp, _ := httpClient.Get(link)
+	defer resp.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c := doc.Find(".comments ul").First()
+	c.Find("li").Each(func(_ int, s *goquery.Selection) {
+		// date extract
+		d := s.Find(".date").Text()
+		if strings.Contains(d, year+"-"+month+"-"+date) {
+			user, exists := s.Find(".name").Find("a").Attr("data-id")
+			if exists {
+				userCommentCount(user)
+			}
+		}
+	})
 }
 
 func getPostList(idx int) {
@@ -79,7 +106,7 @@ func getPostList(idx int) {
 			link, exists := s.Find(".subject").Find("a").Attr("href")
 			if exists {
 				if strings.HasPrefix(link, "http://") {
-					log.Println(link)
+					getComment(link)
 				}
 			}
 			// user extract
@@ -115,6 +142,17 @@ func userWriteCount(user string) {
 	}
 }
 
+func userCommentCount(user string) {
+	_, err := redisClient.Do("HINCRBY", year+month+date+"_commentCount", user, 1)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+func calcPoint() {
+
+}
+
 func main() {
 	// args
 	flag.StringVar(&username, "u", "", "dyeon id")
@@ -128,6 +166,8 @@ func main() {
 	if username == "" || password == "" || year == "" || month == "" || date == "" {
 		color.Red("[!] Argument missing")
 	} else {
+		// init redis
+		initRedisHash()
 		// try login
 		color.Yellow("[!] Login")
 		if login() {
