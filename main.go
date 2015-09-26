@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -47,8 +48,13 @@ func initHttpClient() *http.Client {
 	return client
 }
 
-func initRedisHash() {
-	_, err := redisClient.Do("DEL", year+month+date+"_writeCount")
+func initRedis() {
+	initRedisHash("post")
+	initRedisHash("comment")
+}
+
+func initRedisHash(t string) {
+	_, err := redisClient.Do("DEL", year+month+date+"_"+t+"Count")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -136,7 +142,7 @@ func getPostList(idx int) {
 }
 
 func userWriteCount(user string) {
-	_, err := redisClient.Do("HINCRBY", year+month+date+"_writeCount", user, 1)
+	_, err := redisClient.Do("HINCRBY", year+month+date+"_postCount", user, 1)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -153,6 +159,36 @@ func calcPoint() {
 
 }
 
+func getStatistics() {
+	sortStatistics("post")
+	sortStatistics("comment")
+}
+
+func sortStatistics(t string) {
+	// TODO : study sort algorithm
+	// sort : http://play.golang.org/p/SAYsU8U17P
+	log.Println("Result : ", t)
+	data, err := redis.IntMap(redisClient.Do("HGETALL", year+month+date+"_"+t+"Count"))
+	if err != nil {
+		log.Println(err)
+	} else {
+		n := map[int][]string{}
+		var a []int
+		for k, v := range data {
+			n[v] = append(n[v], k)
+		}
+		for k := range n {
+			a = append(a, k)
+		}
+		sort.Sort(sort.Reverse(sort.IntSlice(a)))
+		for _, k := range a {
+			for _, s := range n[k] {
+				log.Println(s, k)
+			}
+		}
+	}
+}
+
 func main() {
 	// args
 	flag.StringVar(&username, "u", "", "dyeon id")
@@ -167,13 +203,14 @@ func main() {
 		color.Red("[!] Argument missing")
 	} else {
 		// init redis
-		initRedisHash()
+		initRedis()
 		// try login
 		color.Yellow("[!] Login")
 		if login() {
 			// if Success
 			color.Green("[!] Login : PASS")
 			getPostList(startPage)
+			getStatistics()
 		} else {
 			// if Fail
 			color.Red("[!] Login : FAIL")
