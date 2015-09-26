@@ -81,14 +81,15 @@ func getComment(link string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := doc.Find(".comments ul").First()
+	c := doc.Find(".comments-container").Find(".comments.first")
 	c.Find("li").Each(func(_ int, s *goquery.Selection) {
 		// date extract
 		d := s.Find(".date").Text()
-		if strings.Contains(d, year+"-"+month+"-"+date) {
+		if strings.Contains(d, string(year+"-"+month+"-"+date)) {
 			user, exists := s.Find(".name").Find("a").Attr("data-id")
 			if exists {
 				userCommentCount(user)
+				setUserName(user, s.Find(".name").Find("a").First().Text())
 			}
 		}
 	})
@@ -119,9 +120,8 @@ func getPostList(idx int) {
 			user, exists := s.Find(".name span").Find("a").Attr("data-id")
 			if exists {
 				userWriteCount(user)
-				log.Println(user)
 				// user name extract
-				log.Println(s.Find(".name span").Find("a").Text())
+				setUserName(user, s.Find(".name span").Find("a").Text())
 			}
 			return true
 		} else {
@@ -159,6 +159,23 @@ func calcPoint() {
 
 }
 
+func setUserName(user string, name string) {
+	_, err := redisClient.Do("HSET", year+month+date+"_user", user, name)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+func getUserName(user string) string {
+	name, err := redis.String(redisClient.Do("HGET", year+month+date+"_user", user))
+	if err != nil {
+		log.Panic(err)
+		return user
+	} else {
+		return name
+	}
+}
+
 func getStatistics() {
 	sortStatistics("post")
 	sortStatistics("comment")
@@ -183,7 +200,7 @@ func sortStatistics(t string) {
 		sort.Sort(sort.Reverse(sort.IntSlice(a)))
 		for _, k := range a {
 			for _, s := range n[k] {
-				log.Println(s, k)
+				log.Println(getUserName(s), k)
 			}
 		}
 	}
