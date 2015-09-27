@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -184,8 +185,9 @@ func getStatistics() {
 func sortStatistics(t string) {
 	// TODO : study sort algorithm
 	// sort : http://play.golang.org/p/SAYsU8U17P
-	log.Println("Result : ", t)
 	data, err := redis.IntMap(redisClient.Do("HGETALL", year+month+date+"_"+t+"Count"))
+	f, err := os.OpenFile("./statistics/"+year+month+date+"_"+t+".das", os.O_CREATE|os.O_WRONLY, 0666)
+	defer f.Close()
 	if err != nil {
 		log.Println(err)
 	} else {
@@ -200,7 +202,8 @@ func sortStatistics(t string) {
 		sort.Sort(sort.Reverse(sort.IntSlice(a)))
 		for _, k := range a {
 			for _, s := range n[k] {
-				log.Println(getUserName(s), k)
+				f.WriteString(getUserName(s) + "\n")
+				f.WriteString(strconv.Itoa(k) + "\n")
 			}
 		}
 	}
